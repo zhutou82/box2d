@@ -215,11 +215,10 @@ struct b2EPCollider
 	b2Vec2 m_centroidB;
 	b2Vec2 m_v0, m_v1, m_v2, m_v3;
 	b2Vec2 m_normal0, m_normal1, m_normal2;
-	b2Vec2 m_normal;
 	VertexType m_type1, m_type2;
 	b2Vec2 m_lowerLimit, m_upperLimit;
 	float m_radius;
-	bool m_front;
+	bool m_smooth;
 };
 
 // Algorithm:
@@ -243,9 +242,8 @@ void b2EPCollider::Collide(b2Manifold* manifold, const b2EdgeShape* edgeA, const
 	m_v2 = edgeA->m_vertex2;
 	m_v3 = edgeA->m_vertex3;
 	
-	bool hasVertex0 = edgeA->m_hasVertex0;
-	bool hasVertex3 = edgeA->m_hasVertex3;
-	
+	m_smooth = edgeA->m_smooth;
+
 	b2Vec2 edge1 = m_v2 - m_v1;
 	edge1.Normalize();
 	m_normal1.Set(edge1.y, -edge1.x);
@@ -253,176 +251,39 @@ void b2EPCollider::Collide(b2Manifold* manifold, const b2EdgeShape* edgeA, const
 	float offset0 = 0.0f, offset2 = 0.0f;
 	bool convex1 = false, convex2 = false;
 	
-	// Is there a preceding edge?
-	if (hasVertex0)
+	// Smooth collision uses adjacent vertices
+	if (m_smooth)
 	{
 		b2Vec2 edge0 = m_v1 - m_v0;
 		edge0.Normalize();
 		m_normal0.Set(edge0.y, -edge0.x);
 		convex1 = b2Cross(edge0, edge1) >= 0.0f;
 		offset0 = b2Dot(m_normal0, m_centroidB - m_v0);
-	}
-	
-	// Is there a following edge?
-	if (hasVertex3)
-	{
+
 		b2Vec2 edge2 = m_v3 - m_v2;
 		edge2.Normalize();
 		m_normal2.Set(edge2.y, -edge2.x);
 		convex2 = b2Cross(edge1, edge2) > 0.0f;
 		offset2 = b2Dot(m_normal2, m_centroidB - m_v2);
-	}
-	
-	// Determine front or back collision. Determine collision normal limits.
-	if (hasVertex0 && hasVertex3)
-	{
+
+		// Determine collision normal limits.
 		if (convex1 && convex2)
 		{
-			m_front = offset0 >= 0.0f || offset1 >= 0.0f || offset2 >= 0.0f;
-			if (m_front)
-			{
-				m_normal = m_normal1;
-				m_lowerLimit = m_normal0;
-				m_upperLimit = m_normal2;
-			}
-			else
-			{
-				m_normal = -m_normal1;
-				m_lowerLimit = -m_normal1;
-				m_upperLimit = -m_normal1;
-			}
+			m_lowerLimit = m_normal0;
+			m_upperLimit = m_normal2;
 		}
 		else if (convex1)
 		{
-			m_front = offset0 >= 0.0f || (offset1 >= 0.0f && offset2 >= 0.0f);
-			if (m_front)
-			{
-				m_normal = m_normal1;
-				m_lowerLimit = m_normal0;
-				m_upperLimit = m_normal1;
-			}
-			else
-			{
-				m_normal = -m_normal1;
-				m_lowerLimit = -m_normal2;
-				m_upperLimit = -m_normal1;
-			}
+			m_lowerLimit = m_normal0;
+			m_upperLimit = m_normal1;
 		}
 		else if (convex2)
 		{
-			m_front = offset2 >= 0.0f || (offset0 >= 0.0f && offset1 >= 0.0f);
-			if (m_front)
-			{
-				m_normal = m_normal1;
-				m_lowerLimit = m_normal1;
-				m_upperLimit = m_normal2;
-			}
-			else
-			{
-				m_normal = -m_normal1;
-				m_lowerLimit = -m_normal1;
-				m_upperLimit = -m_normal0;
-			}
+			m_lowerLimit = m_normal1;
+			m_upperLimit = m_normal2;
 		}
 		else
 		{
-			m_front = offset0 >= 0.0f && offset1 >= 0.0f && offset2 >= 0.0f;
-			if (m_front)
-			{
-				m_normal = m_normal1;
-				m_lowerLimit = m_normal1;
-				m_upperLimit = m_normal1;
-			}
-			else
-			{
-				m_normal = -m_normal1;
-				m_lowerLimit = -m_normal2;
-				m_upperLimit = -m_normal0;
-			}
-		}
-	}
-	else if (hasVertex0)
-	{
-		if (convex1)
-		{
-			m_front = offset0 >= 0.0f || offset1 >= 0.0f;
-			if (m_front)
-			{
-				m_normal = m_normal1;
-				m_lowerLimit = m_normal0;
-				m_upperLimit = -m_normal1;
-			}
-			else
-			{
-				m_normal = -m_normal1;
-				m_lowerLimit = m_normal1;
-				m_upperLimit = -m_normal1;
-			}
-		}
-		else
-		{
-			m_front = offset0 >= 0.0f && offset1 >= 0.0f;
-			if (m_front)
-			{
-				m_normal = m_normal1;
-				m_lowerLimit = m_normal1;
-				m_upperLimit = -m_normal1;
-			}
-			else
-			{
-				m_normal = -m_normal1;
-				m_lowerLimit = m_normal1;
-				m_upperLimit = -m_normal0;
-			}
-		}
-	}
-	else if (hasVertex3)
-	{
-		if (convex2)
-		{
-			m_front = offset1 >= 0.0f || offset2 >= 0.0f;
-			if (m_front)
-			{
-				m_normal = m_normal1;
-				m_lowerLimit = -m_normal1;
-				m_upperLimit = m_normal2;
-			}
-			else
-			{
-				m_normal = -m_normal1;
-				m_lowerLimit = -m_normal1;
-				m_upperLimit = m_normal1;
-			}
-		}
-		else
-		{
-			m_front = offset1 >= 0.0f && offset2 >= 0.0f;
-			if (m_front)
-			{
-				m_normal = m_normal1;
-				m_lowerLimit = -m_normal1;
-				m_upperLimit = m_normal1;
-			}
-			else
-			{
-				m_normal = -m_normal1;
-				m_lowerLimit = -m_normal2;
-				m_upperLimit = m_normal1;
-			}
-		}		
-	}
-	else
-	{
-		m_front = offset1 >= 0.0f;
-		if (m_front)
-		{
-			m_normal = m_normal1;
-			m_lowerLimit = -m_normal1;
-			m_upperLimit = -m_normal1;
-		}
-		else
-		{
-			m_normal = -m_normal1;
 			m_lowerLimit = m_normal1;
 			m_upperLimit = m_normal1;
 		}
