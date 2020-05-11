@@ -61,6 +61,9 @@ public:
 	/// Optional adjacent vertices. These are used for smooth collision.
 	b2Vec2 m_vertex0, m_vertex3;
 	bool m_hasVertex0, m_hasVertex3;
+
+	/// Is this edge one-sided? Smooth collision only works with one-sided collision.
+	bool m_oneSided;
 };
 
 inline b2EdgeShape::b2EdgeShape()
