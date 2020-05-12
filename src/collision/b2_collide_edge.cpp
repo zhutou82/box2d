@@ -32,6 +32,8 @@ void b2CollideEdgeAndCircle(b2Manifold* manifold,
 							const b2EdgeShape* edgeA, const b2Transform& xfA,
 							const b2CircleShape* circleB, const b2Transform& xfB)
 {
+	b2Assert(false && "update smooth");
+
 	manifold->pointCount = 0;
 	
 	// Compute circle in frame of edge
@@ -62,7 +64,7 @@ void b2CollideEdgeAndCircle(b2Manifold* manifold,
 		}
 		
 		// Is there an edge connected to A?
-		if (edgeA->m_hasVertex0)
+		if (edgeA->m_smooth)
 		{
 			b2Vec2 A1 = edgeA->m_vertex0;
 			b2Vec2 B1 = A;
@@ -100,7 +102,7 @@ void b2CollideEdgeAndCircle(b2Manifold* manifold,
 		}
 		
 		// Is there an edge connected to B?
-		if (edgeA->m_hasVertex3)
+		if (edgeA->m_smooth)
 		{
 			b2Vec2 B2 = edgeA->m_vertex3;
 			b2Vec2 A2 = B;
@@ -344,12 +346,14 @@ void b2EPCollider::Collide(b2Manifold* manifold, const b2EdgeShape* edgeA, const
 	{
 		manifold->type = b2Manifold::e_faceA;
 		
+		b2Vec2 normal = primaryAxis.index == 0 ? m_normal1 : -m_normal1;
+
 		// Search for the polygon normal that is most anti-parallel to the edge normal.
 		int32 bestIndex = 0;
-		float bestValue = b2Dot(m_normal, m_polygonB.normals[0]);
+		float bestValue = b2Dot(normal, m_polygonB.normals[0]);
 		for (int32 i = 1; i < m_polygonB.count; ++i)
 		{
-			float value = b2Dot(m_normal, m_polygonB.normals[i]);
+			float value = b2Dot(normal, m_polygonB.normals[i]);
 			if (value < bestValue)
 			{
 				bestValue = value;
@@ -372,13 +376,13 @@ void b2EPCollider::Collide(b2Manifold* manifold, const b2EdgeShape* edgeA, const
 		ie[1].id.cf.typeA = b2ContactFeature::e_face;
 		ie[1].id.cf.typeB = b2ContactFeature::e_vertex;
 		
-		if (m_front)
+		if (primaryAxis.index == 0)
 		{
 			rf.i1 = 0;
 			rf.i2 = 1;
 			rf.v1 = m_v1;
 			rf.v2 = m_v2;
-			rf.normal = m_normal1;
+			rf.normal = normal;
 		}
 		else
 		{
@@ -386,7 +390,7 @@ void b2EPCollider::Collide(b2Manifold* manifold, const b2EdgeShape* edgeA, const
 			rf.i2 = 0;
 			rf.v1 = m_v2;
 			rf.v2 = m_v1;
-			rf.normal = -m_normal1;
+			rf.normal = normal;
 		}		
 	}
 	else
@@ -486,15 +490,24 @@ b2EPAxis b2EPCollider::ComputeEdgeSeparation()
 {
 	b2EPAxis axis;
 	axis.type = b2EPAxis::e_edgeA;
-	axis.index = m_front ? 0 : 1;
 	axis.separation = FLT_MAX;
 	
 	for (int32 i = 0; i < m_polygonB.count; ++i)
 	{
-		float s = b2Dot(m_normal, m_polygonB.vertices[i] - m_v1);
+		float s = b2Dot(m_normal1, m_polygonB.vertices[i] - m_v1);
+
+		// Front-side
 		if (s < axis.separation)
 		{
+			axis.index = 0;
 			axis.separation = s;
+		}
+
+		// Back-side, non-smooth only
+		if (m_smooth == false && -s < axis.separation)
+		{
+			axis.index = 1;
+			axis.separation = -s;
 		}
 	}
 	
@@ -508,7 +521,7 @@ b2EPAxis b2EPCollider::ComputePolygonSeparation()
 	axis.index = -1;
 	axis.separation = -FLT_MAX;
 
-	b2Vec2 perp(-m_normal.y, m_normal.x);
+	b2Vec2 perp(-m_normal1.y, m_normal1.x);
 
 	for (int32 i = 0; i < m_polygonB.count; ++i)
 	{
@@ -527,19 +540,21 @@ b2EPAxis b2EPCollider::ComputePolygonSeparation()
 			return axis;
 		}
 		
-		// Adjacency
-		if (b2Dot(n, perp) >= 0.0f)
+		if (m_smooth)
 		{
-			if (b2Dot(n - m_upperLimit, m_normal) < -b2_angularSlop)
+			if (b2Dot(n, perp) >= 0.0f)
 			{
-				continue;
+				if (b2Dot(n - m_upperLimit, m_normal1) < -b2_angularSlop)
+				{
+					continue;
+				}
 			}
-		}
-		else
-		{
-			if (b2Dot(n - m_lowerLimit, m_normal) < -b2_angularSlop)
+			else
 			{
-				continue;
+				if (b2Dot(n - m_lowerLimit, m_normal1) < -b2_angularSlop)
+				{
+					continue;
+				}
 			}
 		}
 		
