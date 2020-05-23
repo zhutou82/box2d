@@ -9,8 +9,6 @@ project "box2D"
     
     includedirs { "include" }
     
-    
-    
 	filter "configurations:Debug"
 		runtime "Debug"
         buildoptions "/MTd"
