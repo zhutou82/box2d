@@ -16,7 +16,7 @@ project "box2D"
 
 	filter "configurations:Release"
 		runtime "Release"
-        buildoptions "/MT"
+        buildoptions "/MT" 
 		optimize "on"
         
 
